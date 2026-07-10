@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Improving Health Research Visibility through Metadata</title>
+<style>
+  :root {
+    --sidebar-w: 280px;
+    --accent: #2b6cb0;
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --border: #dde3ea;
+    --text: #1f2937;
+    --done: #2f855a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+  }
+  nav#course-nav {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    padding: 20px 0;
+  }
+  nav#course-nav h1 {
+    font-size: 14px;
+    line-height: 1.4;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: #6b7280;
+    padding: 0 20px 16px;
+    margin: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 20px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    font-size: 14px;
+  }
+  .nav-item:hover { background: #f0f4f8; }
+  .nav-item.active {
+    border-left-color: var(--accent);
+    background: #eaf1fb;
+    font-weight: 600;
+  }
+  .nav-item.locked {
+    opacity: .45;
+    cursor: not-allowed;
+  }
+  .nav-item .status {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid #cbd5e0;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: white;
+  }
+  .nav-item.completed .status { background: var(--done); border-color: var(--done); }
+  .nav-item.completed .status::after { content: "✓"; }
+  .nav-item .sub {
+    display: block;
+    font-weight: 400;
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  main {
+    flex: 1;
+    padding: 24px 32px;
+    overflow-y: auto;
+  }
+  #course-header { margin-bottom: 16px; }
+  #course-header h2 { margin: 0 0 4px; font-size: 22px; }
+  #course-header p { margin: 0; color: #6b7280; font-size: 14px; }
+
+  #h5p-container {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    min-height: 560px;
+    overflow: hidden;
+  }
+
+  #lesson-footer {
+    margin-top: 16px;
+    display: flex;
+    justify-content: flex-end;
+  }
+  button.next-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button.next-btn:hover { background: #24568f; }
+</style>
+</head>
+<body>
+
+<nav id="course-nav">
+  <h1>Improving Health Research Visibility through Metadata: A Microlearning Approach Using the DDI Codebook Standard</h1>
+  <div id="nav-list"></div>
+</nav>
+
+<main>
+  <div id="course-header">
+    <h2 id="active-title">Loading…</h2>
+    <p id="active-subtitle"></p>
+  </div>
+  <div id="h5p-container"></div>
+  <div id="lesson-footer">
+    <button class="next-btn" id="next-btn" style="display:none;">Mark complete &amp; continue →</button>
+  </div>
+</main>
+
+<script src="h5p-player/main.bundle.js"></script>
+<script>
+/*
+  COURSE MANIFEST
+  ----------------
+  Two H5P packages make up this course:
+    1. "course"      – H5P.CoursePresentation with the 5 module videos
+                        (all played from YouTube, nothing self-hosted)
+    2. "final-quiz"  – standalone H5P.QuestionSet, gated until the
+                        course presentation is marked complete
+*/
+const COURSE = [
+  {
+    id: "course",
+    title: "Course: Improving Health Research Visibility through Metadata",
+    subtitle: "Interactive course presentation — videos play directly from YouTube",
+    path: "course"
+  },
+  {
+    id: "final-quiz",
+    title: "Final Quiz",
+    subtitle: "Standalone assessment — 5 questions, requires 4/5 to pass",
+    path: "final-quiz"
+  }
+];
+
+const STORAGE_KEY = "course-progress:ddi-metadata-microlearning";
+let progress = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+let currentIndex = 0;
+
+function saveProgress() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+}
+
+function isUnlocked(index) {
+  if (index === 0) return true;
+  for (let i = 0; i < index; i++) {
+    if (!progress[COURSE[i].id]) return false;
+  }
+  return true;
+}
+
+function renderNav() {
+  const list = document.getElementById("nav-list");
+  list.innerHTML = "";
+  COURSE.forEach((item, i) => {
+    const div = document.createElement("div");
+    const unlocked = isUnlocked(i);
+    div.className = "nav-item" +
+      (i === currentIndex ? " active" : "") +
+      (progress[item.id] ? " completed" : "") +
+      (!unlocked ? " locked" : "");
+    div.innerHTML = `<span class="status"></span><span>${item.title}<span class="sub">${item.subtitle}</span></span>`;
+    if (unlocked) {
+      div.addEventListener("click", () => loadLesson(i));
+    }
+    list.appendChild(div);
+  });
+}
+
+function loadLesson(index) {
+  if (!isUnlocked(index)) return;
+  currentIndex = index;
+  const item = COURSE[index];
+
+  document.getElementById("active-title").textContent = item.title;
+  document.getElementById("active-subtitle").textContent = item.subtitle;
+
+  const nextBtn = document.getElementById("next-btn");
+  const isLast = index === COURSE.length - 1;
+  nextBtn.style.display = progress[item.id] ? "none" : "inline-block";
+  nextBtn.textContent = isLast ? "Mark complete" : "Mark complete & continue →";
+  nextBtn.onclick = () => {
+    progress[item.id] = true;
+    saveProgress();
+    renderNav();
+    if (!isLast) {
+      loadLesson(index + 1);
+    } else {
+      nextBtn.style.display = "none";
+    }
+  };
+
+  const container = document.getElementById("h5p-container");
+  container.innerHTML = "";
+  const el = document.createElement("div");
+  el.id = "h5p-active";
+  container.appendChild(el);
+
+  const options = {
+    h5pJsonPath: item.path,
+    frameJs: "h5p-player/frame.bundle.js",
+    frameCss: "h5p-player/styles/h5p.css"
+  };
+
+  new H5PStandalone.H5P(el, options);
+  renderNav();
+}
+
+renderNav();
+loadLesson(0);
+</script>
+</body>
+</html>
